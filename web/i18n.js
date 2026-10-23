@@ -10,6 +10,7 @@ const I18N = (() => {
     ko: {
       title: "3D 사무실",
       "lang.label": "언어",
+      "grip.label": "패널 폭 조절 — 끌거나 ←→ 키, 두 번 누르면 기본 폭",
       "side.people": "사무실 사람들",
       "side.log": "활동 로그",
       "side.hint": "캐릭터나 이름을 누르면 자세히 봅니다",
@@ -41,6 +42,7 @@ const I18N = (() => {
     en: {
       title: "3D Office",
       "lang.label": "Language",
+      "grip.label": "Resize panel — drag or use ←→ keys, double-click to reset",
       "side.people": "People in the office",
       "side.log": "Activity",
       "side.hint": "Click a character or a name for details",

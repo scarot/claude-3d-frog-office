@@ -40,7 +40,12 @@ button { font: inherit; color: inherit; }
 #notice p + p { margin-top: 2px; }
 
 /* ---------- 오른쪽 패널 ---------- */
-#office-side { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; min-height: 0;
+/* 폭 = 손잡이로 고른 --side-w(없으면 기본), 사무실 자리는 320px 남긴다 */
+#side-grip { flex: none; width: 6px; margin-right: -3px; position: relative; z-index: 1; cursor: col-resize;
+  touch-action: none; }
+#side-grip:hover, #side-grip.drag { background: rgba(20, 30, 25, .18); }
+#side-grip:focus-visible { outline: 2px solid var(--sub); outline-offset: -2px; }
+#office-side { width: clamp(240px, var(--side-w, 320px), calc(100% - 320px)); flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; min-height: 0;
   padding: 10px 10px 0; background: var(--panel); border-left: 1px solid var(--line); }
 #office-side h2 { display: flex; align-items: baseline; gap: 8px; margin: 2px 2px 0; font-size: 14px; font-weight: 700; }
 #office-side h2 small { font-size: 13px; font-weight: 500; color: var(--ink3); }
@@ -94,7 +99,7 @@ button { font: inherit; color: inherit; }
 .o-log.fresh { animation: o-log-in .6s ease-out; }
 @keyframes o-log-in { from { opacity: 0; transform: translateY(-6px); background: #E6F6EC; } to { opacity: 1; transform: none; } }
 
-@media (max-width: 1180px) { #office-side { width: 280px; } }
+@media (max-width: 1180px) { #office-side { width: clamp(240px, var(--side-w, 280px), calc(100% - 320px)); } }
 
 /* 좁은 화면 — 패널을 캔버스 아래로 내린다(숨기지 않는다). 페이지가 세로로 스크롤된다. */
 @media (max-width: 899px) {
@@ -105,6 +110,7 @@ button { font: inherit; color: inherit; }
   #office-stage { overflow: visible; }
   #office-box { position: relative; inset: auto; width: 100%; aspect-ratio: 1496 / 994; }
   #notice { position: static; max-width: none; margin: 8px 16px 0; }
+  #side-grip { display: none; }
   #office-side { width: auto; padding: 10px 16px 16px; border-left: 0; border-top: 1px solid var(--line); }
   #office-people { max-height: 50vh; }
   #office-log { max-height: 60vh; }

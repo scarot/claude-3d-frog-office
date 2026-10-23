@@ -484,6 +484,35 @@
     OfficePanel.render(st.people || [], st.sel, { focus: !!st.sel });
   }
 
+  // ---------- 오른쪽 패널 폭 — 경계를 끌거나 ←→ 키, 두 번 누르면 기본 폭. 이 브라우저에 기억 ----------
+  const SIDE_STORE = "office.sideWidth";
+  function sideGrip() {
+    const g = $("side-grip"), side = $("office-side"), css = document.documentElement.style;
+    try { const w = Number(localStorage.getItem(SIDE_STORE)); if (w > 0) css.setProperty("--side-w", `${w}px`); } catch { /* 기본 폭 */ }
+    const set = w => {
+      if (w) {
+        css.setProperty("--side-w", `${Math.round(w)}px`);
+        w = side.offsetWidth;                      // 범위는 CSS clamp 가 지킨다 — 잘린 실제 폭을 기억
+        css.setProperty("--side-w", `${w}px`);
+      } else css.removeProperty("--side-w");
+      try { if (w) localStorage.setItem(SIDE_STORE, w); else localStorage.removeItem(SIDE_STORE); } catch { /* 기억 못 해도 지금 폭은 바뀐다 */ }
+    };
+    g.addEventListener("pointerdown", ev => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();                           // 끄는 동안 글자가 선택되지 않게
+      g.setPointerCapture(ev.pointerId);
+      g.classList.add("drag");
+      const move = e => set($("main").getBoundingClientRect().right - e.clientX);
+      g.addEventListener("pointermove", move);
+      g.addEventListener("lostpointercapture", () => { g.removeEventListener("pointermove", move); g.classList.remove("drag"); }, { once: true });
+    });
+    g.addEventListener("keydown", ev => {
+      const d = { ArrowLeft: 24, ArrowRight: -24 }[ev.key];
+      if (d) { ev.preventDefault(); set(side.offsetWidth + d); }
+    });
+    g.addEventListener("dblclick", () => set(0));
+  }
+
   // ---------- 고정 문구·언어 ----------
   function applyText() {
     document.title = t("title");
@@ -516,6 +545,7 @@
       bar();
     });
     OfficePanel.onPick((id, keep) => select(id, keep));
+    sideGrip();
     const cv = $("office-canvas");
     cv.addEventListener("click", ev => select(hit(ev)));
     cv.addEventListener("mousemove", ev => { cv.style.cursor = hit(ev) ? "pointer" : "default"; });
