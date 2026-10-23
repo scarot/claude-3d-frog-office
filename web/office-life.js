@@ -24,7 +24,7 @@ const OfficeLife = (() => {
     return h >>> 0;
   }
   const colorOf = name => OFFICE_COLORS[hash(name) % OFFICE_COLORS.length];
-  const speciesOf = name => (hash("종:" + name) % 2 ? "capy" : "frog");
+  const speciesOf = name => (hash("종:" + name) % 2 ? "cat" : "frog");
   const cut = (text, n) => { const a = Array.from(text || ""); return a.length > n ? a.slice(0, n).join("") + "…" : a.join(""); };
   const shuffle = arr => arr.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(v => v[1]);
   // 사건 — 글은 화면이 언어에 맞게 만든다(key = i18n 의 ev.* , arg = 끼워 넣을 말)

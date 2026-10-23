@@ -1,6 +1,6 @@
 "use strict";
 // 사무실 화면 — 캔버스 그리기(30fps), 3초마다 /api/office 읽기, 캐릭터 누르기(고르기), 위 막대·안내 줄.
-// Claude 세션(프로젝트) 하나 = 캐릭터 하나(개구리는 모자 색, 카피바라는 가디건 색으로 프로젝트를 가른다).
+// Claude 세션(프로젝트) 하나 = 캐릭터 하나(개구리는 모자 색, 고양이는 가디건 색으로 프로젝트를 가른다).
 // 누가 무엇을 하는지는 office-life.js, 걷기·충돌은 office-path.js, 지도는 office-world.js, 칸 규격은
 // office-atlas.js(그림 만들 때 자동 생성), 오른쪽 패널은 office-panel.js, 문구는 i18n.js.
 // 탭이 안 보이면 그리기도 데이터 읽기도 멈춘다. 보기 전용 — 누르면 고르기만 한다.
@@ -39,7 +39,7 @@
     return (up ? "stepB" : "stepF") + n;
   }
   const SHEETS = ["frog", "frog2", "frog3", "frogmini", "frogwalk", "frogphone",
-                  "capy", "capy2", "capy3", "capymini", "capywalk", "capyphone"];
+                  "cat", "cat2", "cat3", "catmini", "catwalk", "catphone"];
   const TINT = 0.6;              // 색칠한 칸 축척 — 쓰는 자세만 그때그때 칠해 메모리를 아낀다
   const STAND = 96;              // 보통 캐릭터 키(사무실 그림 픽셀)
   const KID = 0.7;               // 커밋이 적은 저장소 = 꼬마(70%)

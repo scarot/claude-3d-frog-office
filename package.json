@@ -1,7 +1,7 @@
 {
   "name": "claude-3d-frog-office",
   "version": "0.1.0",
-  "description": "A view-only 3D office that shows each Claude Code session as a frog or capybara character. Local only, zero dependencies, macOS and Windows.",
+  "description": "A view-only 3D office that shows each Claude Code session as a frog or cat character. Local only, zero dependencies, macOS and Windows.",
   "type": "module",
   "license": "MIT",
   "repository": {

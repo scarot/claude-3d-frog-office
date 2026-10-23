@@ -3,7 +3,7 @@
 ## 그림 파일 규격
 
 - 위치: `web/office/<종><꼬리>.webp` 와 짝 `web/office/<종><꼬리>-key.webp`
-  - 종 = `frog`(개구리) · `capy`(카피바라)
+  - 종 = `frog`(개구리) · `cat`(고양이)
   - 꼬리 = `""`(기본) · `2` · `3` · `mini`(서브에이전트) · `walk`(걷기) · `phone`(휴대폰)
 - 시트 하나 = 가로 한 줄(걷기 시트는 20칸, 나머지는 8칸). 칸 크기 = `OFFICE_ATLAS.cellW × cellH`(지금 220×280). 모든 시트가 같은 칸 크기여야 한다.
 - 캐릭터 **발끝 = 칸 아래 끝**, 가로 가운데 정렬. 배경은 투명.
@@ -19,7 +19,7 @@
 | `strides[종]` | 걷기 그림 한 장마다 몸이 나아가는 거리(칸 픽셀). 어른은 걸은 거리로 장을 넘겨 발이 바닥에서 안 미끄러진다 |
 | `chairs[]` | 의자 등받이 상자(`box`)·앉는 점(`seat`)·꼬마를 올려 앉히는 양(`kid`) — 사무실 그림과 짝 |
 
-## 지금 걷기 시트(`frogwalk`·`capywalk`) 칸 배치
+## 지금 걷기 시트(`frogwalk`·`catwalk`) 칸 배치
 
 | 칸 | 자세 이름(POSES) | 모습 |
 |---|---|---|
@@ -32,8 +32,8 @@
 
 ## 걷기 그림 교체 순서
 
-1. **덮어쓸 파일** — `web/office/frogwalk.webp`, `frogwalk-key.webp`, `capywalk.webp`, `capywalk-key.webp`, `web/office-atlas.js`.
-   아틀라스의 `heights.frogwalk`·`heights.capywalk` 가 새 그림과 맞아야 한다. 칸 크기가 바뀌면 다른 시트도 모두 같은 크기로 다시 만든다.
+1. **덮어쓸 파일** — `web/office/frogwalk.webp`, `frogwalk-key.webp`, `catwalk.webp`, `catwalk-key.webp`, `web/office-atlas.js`.
+   아틀라스의 `heights.frogwalk`·`heights.catwalk` 가 새 그림과 맞아야 한다. 칸 크기가 바뀌면 다른 시트도 모두 같은 크기로 다시 만든다.
 2. **칸 배치·칸 수가 그대로면 코드 수정 없음.** 바뀌었으면 `web/office-view.js` 맨 위만 고친다.
    - 어른 걷기 장 수 `WALK_N`(지금 8) — 앞걸음은 칸 0~N-1, 뒷걸음은 칸 N~2N-1 로 자동으로 이어진다.
    - `POSES` 의 서브에이전트 걷기(`mWalk*`·`mBack*`) — `["walk", 칸 번호, 원래 보는 쪽]`.
