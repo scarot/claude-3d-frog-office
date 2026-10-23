@@ -32,9 +32,13 @@ export function forget() {
 
 function git(cwd, args) {
   return new Promise((resolve) => {
-    execFile('git', ['-C', cwd, ...args], { timeout: 3000, windowsHide: true, encoding: 'utf8' }, (err, out) => {
-      resolve(err ? null : String(out).trim());
-    });
+    try {
+      execFile('git', ['-C', cwd, ...args], { timeout: 3000, windowsHide: true, encoding: 'utf8' }, (err, out) => {
+        resolve(err ? null : String(out).trim());
+      });
+    } catch {
+      resolve(null); // 윈도우 spawn UNKNOWN 같은 오류는 콜백 대신 바로 던진다 — 스냅샷 전체가 500 이 되지 않게
+    }
   });
 }
 

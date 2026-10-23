@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import cp, { execFileSync } from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
 import { buildSnapshot, cardStatus, forget as forgetSnap, transcriptStatus } from '../server/snapshot.mjs';
 import { forget as forgetAct } from '../server/activity.mjs';
 import { forget as forgetSess, cleanupCards } from '../server/sessions.mjs';
@@ -256,6 +257,25 @@ test('git 저장소: 하위 폴더 세션도 루트로 묶이고, 커밋이 적�
   assert.equal(p.kid, true);
   assert.equal(p.name, 'tiny');
   assert.equal(fs.realpathSync(p.id), fs.realpathSync(repo));
+});
+
+test('git 실행이 바로 던져도(윈도우 spawn UNKNOWN) 스냅샷은 git 없이 나온다', async () => {
+  const base = fresh();
+  const cwd = folder(base, 'my-app');
+  transcript(cwd, 's1', [asst(iso(1000), [read('/x/a')], 'tool_use')]);
+  const orig = cp.execFile;
+  cp.execFile = () => {
+    throw Object.assign(new Error('spawn UNKNOWN'), { code: 'UNKNOWN' });
+  };
+  syncBuiltinESMExports();
+  try {
+    const s = await snap();
+    assert.equal(s.people.length, 1);
+    assert.equal(s.people[0].commits, null);
+  } finally {
+    cp.execFile = orig;
+    syncBuiltinESMExports();
+  }
 });
 
 test('청소: 하루 넘은 ended 카드·7일 넘은 카드 파일을 치운다', () => {
