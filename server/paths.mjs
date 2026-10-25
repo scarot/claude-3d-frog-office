@@ -27,6 +27,7 @@ export const startingLock = () => path.join(officeHome(), 'server.starting');
 export const pidFile = (demo = false) => path.join(officeHome(), demo ? 'server-demo.pid' : 'server.pid');
 export const projectsDir = () => path.join(configDir(), 'projects');
 export const settingsFile = () => path.join(configDir(), 'settings.json');
+export const teamsDir = () => path.join(configDir(), 'teams'); // 에이전트 팀(실험 기능) 설정
 
 /** Claude Code 가 대화 폴더 이름을 만드는 규칙 — 영숫자가 아닌 글자는 전부 '-' */
 export function encodeCwd(cwd) {

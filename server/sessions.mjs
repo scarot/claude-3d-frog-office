@@ -1,7 +1,7 @@
-// 세션 카드(훅이 쓴 것) 읽기·청소, 대화 파일 찾기, 대화 기록 대체 모드용 최근 대화 찾기.
+// 세션 카드(훅이 쓴 것) 읽기·청소, 대화 파일 찾기, 대화 기록 대체 모드용 최근 대화 찾기, 에이전트 팀 읽기.
 import fs from 'node:fs';
 import path from 'node:path';
-import { encodeCwd, projectsDir, sessionsDir } from './paths.mjs';
+import { encodeCwd, projectsDir, sessionsDir, teamsDir } from './paths.mjs';
 
 export const SID_RE = /^[A-Za-z0-9._-]+$/;
 const DAY_MS = 24 * 3600 * 1000;
@@ -42,6 +42,36 @@ export function readCards() {
     cards.push({ ...card, sessionId: sid });
   }
   return cards;
+}
+
+/**
+ * 에이전트 팀(실험 기능, CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1) → Map(책임자 세션 id → { name, members }).
+ * 정본은 <config>/teams/<팀>/config.json — 실측(Claude Code 2.1.310): leadSessionId = 책임자 세션,
+ * members = [team-lead, 팀원…](name·agentType·model). 세션이 끝나면 팀 폴더째 지워진다(그러면 팀원도 퇴근).
+ */
+export function readTeams() {
+  const out = new Map();
+  let names;
+  try {
+    names = fs.readdirSync(teamsDir());
+  } catch {
+    return out;
+  }
+  for (const n of names) {
+    let cfg;
+    try {
+      cfg = JSON.parse(fs.readFileSync(path.join(teamsDir(), n, 'config.json'), 'utf8'));
+    } catch {
+      continue;
+    }
+    const lead = cfg && typeof cfg.leadSessionId === 'string' ? cfg.leadSessionId : '';
+    if (!lead || !Array.isArray(cfg.members)) continue;
+    const members = cfg.members
+      .filter((m) => m && typeof m.name === 'string' && m.name && m.agentType !== 'team-lead')
+      .map((m) => ({ name: m.name, type: String(m.agentType || ''), model: String(m.model || '') }));
+    out.set(lead, { name: String(cfg.name || n), members });
+  }
+  return out;
 }
 
 /** 오래된 카드 치우기 — 7일 넘은 파일, 하루 넘은 ended 카드, 버려진 .tmp */

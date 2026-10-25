@@ -23,8 +23,24 @@ Claude Code 세션 하나하나를 사무실 캐릭터(개구리·고양이)로 
 Claude Code ──(훅: stdin JSON)──▶ hooks/office-hook.mjs ──▶ ~/.claude-office/sessions/<session_id>.json  (세션 카드)
                                                          ┌─▶ 세션 카드 + 생존 판정(pid)
 브라우저 ◀──(3초 폴링 GET /api/office)── server/server.mjs ┼─▶ ~/.claude/projects/**/<session_id>.jsonl 꼬리 (지금 하는 일·로그)
-                                                         └─▶ <session_id>/subagents/agent-*.jsonl (서브에이전트)
+                                                         ├─▶ <session_id>/subagents/agent-*.jsonl (서브에이전트·팀원)
+                                                         └─▶ <config>/teams/<팀>/config.json (에이전트 팀)
 ```
+
+### 에이전트 팀 (실험 기능 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`)
+
+문서에 없는 부분은 실측(Claude Code 2.1.310, 윈도우, in-process 팀원)으로 정했다. 형식이 바뀌면 조용히 넘긴다.
+
+| 무엇 | 어디서 |
+|---|---|
+| 책임자 세션 | `teams/<팀>/config.json` 의 `leadSessionId`. 세션이 끝나면 팀 폴더째 지워진다(그러면 팀원도 퇴근) |
+| 팀원 목록 | 같은 파일 `members[]` 중 `agentType ≠ "team-lead"` — `name`·`agentType`·`model` |
+| 팀원 대화 | 책임자 세션의 `subagents/agent-*.jsonl`, 짝 `.meta.json` 의 `taskKind: "in_process_teammate"`·`name`. 서브에이전트 목록(`subs`)에서는 빠진다 |
+| 팀원 상태 | 서브에이전트와 같은 잣대 — 마지막 줄이 말을 마친 답(end_turn)이면 대기(`rest`), 아니면 `working` |
+| 보고 | 책임자 대화의 user 줄 `<teammate-message teammate_id="…" summary="…">본문</teammate-message>` → Act `report`. 본문이 JSON(대기 알림 `idle_notification` 등)이면 뺀다. 받은편지함(`inboxes/*.json`)은 읽히면 2초 안에 비워져 쓰지 않는다 |
+| 팀원 승인 요청 | 책임자 세션에 뜬다(공식 문서) → 책임자의 `decision` |
+
+화면: 책임자는 회의실 화이트보드 쪽 앞줄 의자(관제석)에 앉고 화이트보드에 팀원 상태(관제판)를 그린다. 팀원은 여느 사람처럼 책상에서 일한다. 보기 전용은 그대로 — 승인·지시는 책임자 터미널에서 한다.
 
 - 상태 폴더: 환경변수 `CLAUDE_OFFICE_HOME` 이 있으면 그것, 없으면 `~/.claude-office`.
 - Claude 설정 폴더: 환경변수 `CLAUDE_CONFIG_DIR` 이 있으면 그것, 없으면 `~/.claude`.
@@ -87,9 +103,16 @@ PermissionRequest 는 승인 창이 뜨는 즉시, Notification(permission_promp
   "subs": [ { "id": "a1b2", "type": "Explore", "desc": "find auth code", "doing": Act|null } ],  // 최대 12
   "subCount": 1,                   // 실제로 일하는 서브에이전트 수(12 초과 가능)
   "doing": Act|null,               // 지금 하는 일(가장 최근 활동)
-  "log": [ { "at": "ISO", "k": "read", "a": "server.mjs" } ]  // 최근 8개, 오래된 것 → 최신
+  "log": [ { "at": "ISO", "k": "read", "a": "server.mjs" } ],  // 최근 8개, 오래된 것 → 최신
+  // ↓ 에이전트 팀일 때만 있는 칸
+  "role": "lead",                  // "lead"(팀 책임자 세션이 있는 프로젝트) | "teammate"
+  "lead": "/Users/me/my-app",      // teammate 만: 책임자 Person id
+  "type": "Explore", "model": "opus"   // teammate 만: config.json 의 agentType·model
 }
 ```
+
+팀원 Person 은 `id = "<책임자 id>#<팀 이름>#<팀원 이름>"`, `name` = 팀원 이름, `path` = 책임자 경로, `commits: null`·`subs: []`.
+이름 겹침 가르기("이름 (부모)")에서는 팀원을 빼고 센다.
 
 **Act** = 활동 한 줄을 언어와 무관하게 표현한 것. 화면(i18n.js)이 언어에 맞게 문장으로 만든다.
 
@@ -113,6 +136,7 @@ PermissionRequest 는 승인 창이 뜨는 즉시, Notification(permission_promp
 | skill | Skill | skill 이름 24자 |
 | mcp | `mcp__서버__도구` | 마지막 토막(도구 이름) |
 | tool | 그 밖의 도구 | 도구 이름 24자 |
+| report | user 줄의 `<teammate-message>`(에이전트 팀 보고) | `팀원 이름: summary`(없으면 본문) 60자 |
 
 thinking·빈 글은 건너뛴다. 대화 기록 형식은 Claude Code 내부 형식이라 바뀔 수 있다 — 모르는 모양은 조용히 넘긴다.
 

@@ -85,7 +85,9 @@ const OfficeLife = (() => {
   const occupied = (pt, me) => [...L.people.values()].some(q => q !== me && !q.leaving && dist(goalOf(q), pt) < 34)
     || [...L.taken].some(([k, who]) => who !== me?.id && spotAt(k) && dist(spotAt(k), pt) < 34)
     // 회의실 의자를 일자리로 배정받은 사람(승인 대기로 잠깐 일어난 사이에도 그 의자는 그 사람 것)
-    || [...L.desks].some(([n, k]) => k < 0 && n !== me?.id && dist(sitAt(OFFICE_OVERFLOW[-1 - k].seat, SIT_DESK), pt) < 34);
+    || [...L.desks].some(([n, k]) => k < 0 && n !== me?.id && dist(sitAt(OFFICE_OVERFLOW[-1 - k].seat, SIT_DESK), pt) < 34)
+    // 관제석은 책임자가 잠깐 일어나도(의자 앞에서 승인 대기) 책임자 것
+    || (towerOwner() && towerOwner() !== me && dist(sitAt(TOWER.seat, SIT_DESK), pt) < 34);
   function takeSpot(p, kind) {
     const list = OFFICE_SPOTS[kind] || [];
     const free = list.map((s, i) => i).filter(i => !L.taken.has(`${kind}:${i}`) && !occupied(list[i].at, p));
@@ -137,12 +139,34 @@ const OfficeLife = (() => {
   const sitAt = (pt, dy) => [pt[0], pt[1] + dy];
   const chairOf = d => d.chair ?? OFFICE_DESKS.indexOf(d);     // 책상이면 책상 번호, 회의실 자리면 그 의자 번호
 
+  // ---------- 관제실 — 에이전트 팀 책임자(role=lead)는 회의실 앞줄, 화이트보드에 가장 가까운 의자에서 팀을 지켜본다 ----------
+  // 일할 때도 쉴 때(= 사용자 지시 대기)도 그 자리. 승인 대기면 의자 앞으로 일어나 폴짝 — 화이트보드 앞에 서면
+  // 관제판이 가려진다. 팀원은 여느 사람처럼 책상에서.
+  const TOWER = OFFICE_OVERFLOW[1];
+  // 관제석 주인 = 책임자 중 맨 앞 한 명 — 팀이 둘이면 둘째 책임자는 여느 사람처럼 책상에서 일한다
+  const towerOwner = () => [...L.people.values()].find(q => q.role === "lead" && !q.leaving) || null;
+  function tower(p) {
+    if (p.status === "decision") {
+      return run(p, [{ go: [TOWER.seat[0] + 10, TOWER.seat[1] + SIT_DESK + 40], via: TOWER.via },
+                     { pose: "stand", dur: Infinity, hop: true, mix: [["wave", 0.25, 1.1]] }]);
+    }
+    const seat = sitAt(TOWER.seat, SIT_DESK);
+    for (const q of L.people.values()) {           // 책임자가 오기 전에 그 의자에 앉아 있던 사람은 비켜 준다
+      if (q !== p && !q.leaving && dist(goalOf(q), seat) < 34) choose(q);
+    }
+    const work = modeOf(p) === "work";
+    return run(p, [{ go: seat, via: TOWER.via },
+                   { pose: "sitBack", dur: Infinity, work, chair: TOWER.chair,
+                     mix: work ? [["cheer", 0.06, 1.3], ["scratch", 0.09, 1.6]] : deskRestMix("sitBack") }]);
+  }
+
   // ---------- 무엇을 할까 ----------
   const homeOf = p => (p.home && Object.hasOwn(OFFICE_HOMES, p.home) ? OFFICE_HOMES[p.home] : null);
   function choose(p) {
     leaveChat(p);
     release(p);
     if (p.leaving) return;
+    if (towerOwner() === p) return tower(p);
     const home = homeOf(p);
     if (home && modeOf(p) === "work") {        // 서버실 랙 앞에 서서 일한다 — 가끔 생각·통화·만세
       const w = home.work;
@@ -422,10 +446,10 @@ const OfficeLife = (() => {
         L.people.set(d.id, p);
       }
       const was = p.status, wasDoing = p.doing, back = p.leaving, wasMode = fresh ? null : modeOf(p);
-      const wasDesk = L.desks.get(p.id);
+      const wasDesk = L.desks.get(p.id), wasRole = p.role;
       Object.assign(p, { name: d.name, status: d.status, ask: d.ask || "", kid: !!d.kid, home: d.home || null,
                          doing: d.doing || "", subCount: d.subCount || 0, subs: d.subs || [], commits: d.commits,
-                         path0: d.path });
+                         path0: d.path, role: d.role || null, lead: d.lead || null });
       if (fresh) {
         if (L.synced) {                              // 나중에 켠 세션 = 문으로 출근
           p.x = OFFICE_NODES.out[0]; p.y = OFFICE_NODES.out[1]; p.alpha = 0;
@@ -440,6 +464,8 @@ const OfficeLife = (() => {
       } else if (back) {
         p.leaving = false; p.gone = false; p.alpha = 1;
         choose(p);
+      } else if (wasRole !== p.role) {
+        choose(p);                                 // 팀이 생기거나 없어졌다 — 관제석으로 가거나 책상으로 돌아간다
       } else if (was !== p.status || wasMode !== modeOf(p)) {
         if (p.status === "working" && was !== "working") event(p, "work");
         else if (p.status === "decision" && was !== "decision") event(p, "ask", p.ask);
@@ -587,6 +613,6 @@ const OfficeLife = (() => {
     }
   }
 
-  return { L, SIT_DESK, sync, update, cut, nearest, route, colorOf, speciesOf, modeOf, blocked, onFloor,
+  return { L, SIT_DESK, sync, update, cut, nearest, route, colorOf, speciesOf, modeOf, blocked, onFloor, towerOwner,
            drainEvents: () => L.events.splice(0, L.events.length) };
 })();

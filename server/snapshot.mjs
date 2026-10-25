@@ -1,12 +1,13 @@
 // GET /api/office 응답 조립 — 세션 카드 + 대화 기록 대체 모드를 합쳐 프로젝트(루트 폴더)별 한 명으로.
+// 에이전트 팀이면 그 프로젝트 사람이 책임자(role=lead)가 되고, 팀원은 한 명씩 따로 세운다(role=teammate).
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { loadConfig } from './config.mjs';
 import { IS_WIN, pathKey, settingsFile } from './paths.mjs';
 import { cardAlive, processStarts } from './liveness.mjs';
-import { cleanupCards, mtimeOf, readCards, recentTranscripts, transcriptFor } from './sessions.mjs';
-import { LOG_N, MAX_SUBS, oneLine, readTranscript, runningSubagents } from './activity.mjs';
+import { cleanupCards, mtimeOf, readCards, readTeams, recentTranscripts, transcriptFor } from './sessions.mjs';
+import { LOG_N, MAX_SUBS, oneLine, readTranscript, runningSubagents, subagentRunning, teammateFiles } from './activity.mjs';
 import { installedEvents } from './hooks-config.mjs';
 
 export const API_VERSION = 1;
@@ -126,6 +127,7 @@ function collectSessions(cfg, now, starts) {
     if (!cwd) continue;
     const status = cardStatus(card, info.last, now);
     out.push({
+      sessionId: card.sessionId,
       cwd,
       status,
       ask: status === 'decision' ? oneLine(card.message, ASK_CHARS) : '',
@@ -140,7 +142,7 @@ function collectSessions(cfg, now, starts) {
       if (known.has(t.sessionId)) continue;
       const info = readTranscript(t.file);
       if (!info.cwd) continue;
-      out.push({ cwd: info.cwd, status: transcriptStatus(info.last, t.mtimeMs, now), ask: '', at: t.mtimeMs, source: 'transcript', transcript: t.file, info });
+      out.push({ sessionId: t.sessionId, cwd: info.cwd, status: transcriptStatus(info.last, t.mtimeMs, now), ask: '', at: t.mtimeMs, source: 'transcript', transcript: t.file, info });
     }
   }
   return { sessions: out, cardCount: cards.length };
@@ -167,6 +169,7 @@ export async function buildSnapshot(opts = {}) {
     groups.get(key).items.push(s);
   }
 
+  const teams = readTeams();
   const people = [];
   for (const [key, { root, items }] of groups) {
     const base = path.basename(root) || root;
@@ -179,6 +182,8 @@ export async function buildSnapshot(opts = {}) {
     const lastAt = (s) => (s.info.log.length ? s.info.log[s.info.log.length - 1].at : '');
     const latest = items.reduce((a, b) => (lastAt(b) > lastAt(a) ? b : a));
     const log = items.flatMap((s) => s.info.log).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)).slice(-LOG_N);
+    const source = items.some((s) => s.source === 'hook') ? 'hook' : 'transcript';
+    const led = items.filter((s) => teams.has(s.sessionId));
     people.push({
       id: root,
       name: base,
@@ -187,7 +192,7 @@ export async function buildSnapshot(opts = {}) {
       pending: asks.length,
       ask: asks.length ? asks[0].ask : '',
       sessions: items.length,
-      source: items.some((s) => s.source === 'hook') ? 'hook' : 'transcript',
+      source,
       commits,
       kid: commits !== null && commits < cfg.kidCommits,
       home: homeOf(cfg.homes, base, key),
@@ -195,13 +200,46 @@ export async function buildSnapshot(opts = {}) {
       subCount: subs.length,
       doing: latest.info.doing,
       log,
+      ...(led.length ? { role: 'lead' } : {}),
     });
+    // 팀원 — 일하는지는 서브에이전트와 같은 잣대(마지막 줄이 말을 마친 답이면 대기). 팀원의 승인 요청은
+    // 책임자 세션에 뜨므로(공식 문서) 책임자의 decision 으로 보인다
+    for (const s of led) {
+      const team = teams.get(s.sessionId);
+      const files = teammateFiles(s.transcript);
+      for (const m of team.members) {
+        const f = files.get(m.name);
+        const info = readTranscript(f);
+        people.push({
+          id: `${root}#${team.name}#${m.name}`,
+          name: m.name,
+          path: root,
+          status: f && subagentRunning(f, now) ? 'working' : 'rest',
+          pending: 0,
+          ask: '',
+          sessions: 1,
+          source,
+          commits: null,
+          kid: false,
+          home: null,
+          subs: [],
+          subCount: 0,
+          doing: info.doing,
+          log: info.log,
+          role: 'teammate',
+          lead: root,
+          type: m.type,
+          model: m.model,
+        });
+      }
+    }
   }
 
-  // 같은 폴더 이름이 둘이면 "이름 (부모)" 로 가른다
+  // 같은 폴더 이름이 둘이면 "이름 (부모)" 로 가른다(팀원 이름은 폴더가 아니라 빼고 센다)
   const count = new Map();
-  for (const p of people) count.set(nameKey(p.name), (count.get(nameKey(p.name)) || 0) + 1);
-  for (const p of people) {
+  const folks = people.filter((p) => p.role !== 'teammate');
+  for (const p of folks) count.set(nameKey(p.name), (count.get(nameKey(p.name)) || 0) + 1);
+  for (const p of folks) {
     if (count.get(nameKey(p.name)) > 1) p.name = `${p.name} (${path.basename(path.dirname(p.path))})`;
   }
   people.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));

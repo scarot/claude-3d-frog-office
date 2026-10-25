@@ -236,13 +236,16 @@
 
   // ---------- 글씨 — 이름표(발밑)·말풍선(머리 위) ----------
   function roundBox(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x + 0.5, y + 0.5, w, h, r); }
+  // 이름표 글 — 에이전트 팀 책임자는 ★, 팀원은 "· 팀원"
+  const tagOf = p => (p.role === "lead" ? t("tag.lead", { name: p.name }) : p.role === "teammate" ? t("tag.mate", { name: p.name }) : p.name);
   function nameTags(ctx) {
     const tags = [], fs = st.view.small ? 10 : 12, th = fs + 6;
     ctx.font = `600 ${fs}px ${FONT}`;
     for (const p of L.people.values()) {
       if (!p.box || p.alpha < 0.3) continue;
       const [x, y] = scr(p.x, p.feet);
-      tags.push({ p, x, y: y + 3, w: ctx.measureText(p.name).width + 18, h: th });
+      const label = tagOf(p);
+      tags.push({ p, label, x, y: y + 3, w: ctx.measureText(label).width + 18, h: th });
     }
     tags.sort((a, b) => a.y - b.y);
     const placed = [];
@@ -261,7 +264,7 @@
       ctx.fillStyle = on ? inkOn(g.p.color) : g.p.color;
       ctx.beginPath(); ctx.arc(lx + 8, g.y + g.h / 2 + 0.5, 3, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = on ? inkOn(g.p.color) : "#1E2622"; ctx.textBaseline = "middle"; ctx.font = `${on ? 800 : 600} ${fs}px ${FONT}`;
-      ctx.fillText(g.p.name, lx + 14, g.y + g.h / 2 + 1);
+      ctx.fillText(g.label, lx + 14, g.y + g.h / 2 + 1);
     }
   }
   function bubbles(ctx) {
@@ -329,6 +332,42 @@
   }
   const scr = (x, y) => [st.view.ox + x * st.view.s, st.view.oy + y * st.view.s];
 
+  // ---------- 관제판 — 회의실 화이트보드에 책임자 팀의 팀원 상태를 쓴다 ----------
+  // 그림 속 판의 모서리(왼쪽 위·오른쪽 위·왼쪽 아래, floor.webp 를 확대해 잼)에 맞춰 기울여 그린다 — 판 안 좌표 BOARD_W×BOARD_H
+  const BOARD = { tl: [1141, 137], tr: [1285, 197], bl: [1142, 209] }, BOARD_W = 150, BOARD_H = 75, BOARD_ROWS = 4;
+  const INK = "#2B3640";
+  function board(ctx) {
+    const lead = OfficeLife.towerOwner();
+    if (!lead) return;
+    const mates = [...L.people.values()].filter(q => q.role === "teammate" && q.lead === lead.id && !q.leaving);
+    const { tl, tr, bl } = BOARD;
+    ctx.save();
+    ctx.transform((tr[0] - tl[0]) / BOARD_W, (tr[1] - tl[1]) / BOARD_W, (bl[0] - tl[0]) / BOARD_H, (bl[1] - tl[1]) / BOARD_H, tl[0], tl[1]);
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = INK;
+    ctx.font = `800 10px ${FONT}`;
+    ctx.fillText(`${t("board.title")} · ★ ${OfficeLife.cut(lead.name, 14)}`, 8, 10);
+    ctx.fillRect(8, 17, BOARD_W - 16, 0.8);
+    const shown = mates.length > BOARD_ROWS ? BOARD_ROWS - 1 : mates.length;   // 넘치면 마지막 줄은 "외 n명"
+    mates.slice(0, shown).forEach((m, i) => {
+      const y = 27 + i * 12, busy = OfficeLife.modeOf(m) === "work";
+      ctx.fillStyle = m.color;
+      ctx.beginPath(); ctx.arc(12, y, 3, 0, Math.PI * 2); ctx.fill();
+      const name = OfficeLife.cut(m.name, 12);
+      ctx.fillStyle = INK; ctx.font = `700 9px ${FONT}`;
+      ctx.fillText(name, 19, y);
+      // 상태는 이름 바로 뒤에 — 판이 기울어 있어 멀리 떨어뜨리면 다음 줄처럼 보인다
+      const nx = 19 + ctx.measureText(name).width + 6;
+      ctx.fillStyle = busy ? "#17733A" : "#7A8A99"; ctx.font = `600 9px ${FONT}`;
+      ctx.fillText(busy ? `✎ ${t("board.work")}` : `○ ${t("board.idle")}`, nx, y);
+    });
+    if (shown < mates.length) {
+      ctx.fillStyle = "#7A8A99"; ctx.font = `600 9px ${FONT}`;
+      ctx.fillText(t("board.more", { n: mates.length - shown }), 19, 27 + shown * 12);
+    }
+    ctx.restore();
+  }
+
   function draw() {
     const cv = $("office-canvas"), ctx = cv.getContext("2d"), v = st.view;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -338,6 +377,7 @@
     ctx.setTransform(v.s * v.dpr, 0, 0, v.s * v.dpr, v.ox * v.dpr, v.oy * v.dpr);
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(st.imgs.floor, 0, 0, OFFICE_W, OFFICE_H);
+    board(ctx);
     drawRing(ctx, false);
     // 깊이 순서(발끝 y)대로 — 책상·회의실 의자 등받이도 끼워 넣는다: 앉은 사람(발끝 = 등받이 아래끝 - 2)보다 나중,
     // 의자 앞 통로를 지나는 사람보다 먼저. 그래서 앉은 사람은 허리 아래가 등받이에 가려진다.
@@ -425,6 +465,7 @@
                        subs: Array.isArray(d.subs) ? d.subs : [], log: Array.isArray(d.log) ? d.log : [] });
   const toLife = d => ({
     id: d.id, name: d.name, status: d.status, ask: d.ask, kid: d.kid, home: d.home, commits: d.commits, path: d.path,
+    role: d.role, lead: d.lead,
     doing: I18N.act(d.doing), subCount: d.subCount || 0,
     subs: d.subs.map(s => ({ id: String(s.id), type: s.type || "", desc: s.desc || "", doing: I18N.act(s.doing) })),
   });
@@ -524,6 +565,7 @@
   // 시험·점검용 — 지금 사무실에 누가 어디서 무엇을 하는지(화면 좌표 포함)
   window.officeDebug = () => [...L.people.values()].map(p => ({
     id: p.id, name: p.name, species: p.species, color: p.color, kid: !!p.kid, status: p.status, home: p.home,
+    role: p.role, lead: p.lead, chair: p.path.length ? null : p.act?.chair ?? null,
     act: p.path.length ? "walk" : p.act?.work ? "desk" : p.act?.hop ? "ask" : (p.act?.pose || "idle"),
     pose: p.box ? poseOf(p, L.t) : null, bubble: p.bubble?.text || "", selected: p.id === st.sel,
     minis: [...L.minis.values()].filter(m => m.owner === p.id && (m.state === "wait" || m.state === "in")).length,

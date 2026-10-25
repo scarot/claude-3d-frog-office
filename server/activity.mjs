@@ -128,19 +128,44 @@ function entryState(e) {
 
 const newAcc = () => ({ events: [], last: null, cwd: '' });
 
+// 에이전트 팀: 팀원이 책임자에게 보낸 말은 책임자 대화에 user 줄로 남는다(실측 2.1.310) —
+// <teammate-message teammate_id="reader" color="blue" summary="README 세 줄 요약 전달">본문</teammate-message>
+const TEAM_MSG = /<teammate-message([^>]*)>([\s\S]*?)<\/teammate-message>/g;
+const attrOf = (attrs, key) => (attrs.match(new RegExp(`\\b${key}="([^"]*)"`)) || [])[1] || '';
+
+/** user 줄 글 → 팀원 보고 Act 들. 본문이 JSON 인 것(대기 알림 idle_notification 등)은 뺀다 — 쉬는지는 팀원 대화로 안다 */
+export function reports(text) {
+  if (!text.includes('<teammate-message')) return [];
+  const out = [];
+  for (const [, attrs, body] of text.matchAll(TEAM_MSG)) {
+    const who = attrOf(attrs, 'teammate_id');
+    const b = body.trim();
+    let control = false;
+    try {
+      control = typeof JSON.parse(b)?.type === 'string';
+    } catch {
+      /* 보통 글 */
+    }
+    if (who && !control) out.push({ k: 'report', a: oneLine(`${who}: ${attrOf(attrs, 'summary') || b}`, 60) });
+  }
+  return out;
+}
+
 /** 대화 줄 하나를 누적값(최근 활동·마지막 상태·cwd)에 더한다 — 앞에서 뒤 순서로 */
 function absorb(acc, e) {
   if (typeof e.cwd === 'string' && e.cwd) acc.cwd = e.cwd;
   const st = entryState(e);
   if (st) acc.last = st;
+  const at = String(e.timestamp || '');
   const content = e.type === 'assistant' && e.message && Array.isArray(e.message.content) ? e.message.content : null;
   if (content) {
     for (const block of content) {
       const act = describe(block);
-      if (act) acc.events.push({ at: String(e.timestamp || ''), k: act.k, a: act.a });
+      if (act) acc.events.push({ at, k: act.k, a: act.a });
     }
-    if (acc.events.length > LOG_N) acc.events.splice(0, acc.events.length - LOG_N);
   }
+  if (e.type === 'user') for (const act of reports(userText(e.message))) acc.events.push({ at, ...act });
+  if (acc.events.length > LOG_N) acc.events.splice(0, acc.events.length - LOG_N);
   return acc;
 }
 
@@ -306,19 +331,22 @@ function readMeta(file) {
   }
 }
 
-/** 그 대화가 띄운 서브에이전트 중 지금 일하는 것 — 먼저 출근한 순서 */
-export function runningSubagents(transcript, now = Date.now()) {
+/** 그 대화의 subagents/agent-*.jsonl — 서브에이전트와 에이전트 팀의 팀원(in-process)이 함께 쌓인다(실측 2.1.310) */
+function subagentFiles(transcript) {
   if (!transcript) return [];
   const folder = path.join(transcript.replace(/\.jsonl$/, ''), 'subagents');
-  let names;
   try {
-    names = fs.readdirSync(folder).filter((n) => n.startsWith('agent-') && n.endsWith('.jsonl'));
+    return fs.readdirSync(folder).filter((n) => n.startsWith('agent-') && n.endsWith('.jsonl')).map((n) => path.join(folder, n));
   } catch {
     return [];
   }
+}
+const isTeammate = (meta) => meta.taskKind === 'in_process_teammate';
+
+/** 그 대화가 띄운 서브에이전트 중 지금 일하는 것 — 먼저 출근한 순서. 팀원은 따로 사람으로 세우니 뺀다 */
+export function runningSubagents(transcript, now = Date.now()) {
   const found = [];
-  for (const n of names) {
-    const f = path.join(folder, n);
+  for (const f of subagentFiles(transcript)) {
     if (!subagentRunning(f, now)) continue;
     let born;
     try {
@@ -328,10 +356,11 @@ export function runningSubagents(transcript, now = Date.now()) {
       continue;
     }
     const meta = readMeta(f);
+    if (isTeammate(meta)) continue;
     found.push({
       born,
       sub: {
-        id: n.slice('agent-'.length, -'.jsonl'.length),
+        id: path.basename(f).slice('agent-'.length, -'.jsonl'.length),
         type: String(meta.agentType || ''),
         desc: oneLine(meta.description, 60),
         doing: readTranscript(f).doing,
@@ -340,4 +369,21 @@ export function runningSubagents(transcript, now = Date.now()) {
   }
   found.sort((a, b) => a.born - b.born);
   return found.map((x) => x.sub);
+}
+
+/** 팀원 이름 → 그 팀원의 대화 파일(같은 이름이 여럿이면 가장 최근 것). 메타를 다 읽으니 팀 책임자 대화에만 쓴다 */
+export function teammateFiles(transcript) {
+  const out = new Map();
+  for (const f of subagentFiles(transcript)) {
+    const meta = readMeta(f);
+    if (!isTeammate(meta) || typeof meta.name !== 'string' || !meta.name) continue;
+    let m;
+    try {
+      m = fs.statSync(f).mtimeMs;
+    } catch {
+      continue;
+    }
+    if (!out.has(meta.name) || m > out.get(meta.name).m) out.set(meta.name, { f, m });
+  }
+  return new Map([...out].map(([name, x]) => [name, x.f]));
 }

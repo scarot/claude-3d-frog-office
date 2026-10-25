@@ -77,6 +77,7 @@ The staff work harder than you'd expect, and slack off better than you'd expect.
 - **They mean business.** They type with their shoulders bouncing and show what they're doing above their head, like "📖 reading server.mjs".
 - **They hop when they need you.** An employee waiting for approval stands up and hops around with red text. Hard to ignore.
 - **Subagents are little interns.** Kids in the same color cap line up next to their owner, then say goodbye and leave when the job is done.
+- **The team lead runs the control room.** With Claude Code agent teams (experimental), the lead wears a ★ on their name tag and sits in the meeting room, watching teammates on the whiteboard. Teammates wear a "· teammate" tag and work at desks; their reports show up in the activity log as "📨 Report". Approvals and instructions still happen in the lead's terminal.
 - **Breaks are taken seriously.** They giggle at their phones on the sofa, brew coffee in the pantry, and gather in the meeting room for important agenda items like lunch.
 - **They talk to themselves, and to each other.** "Leave on time today?" "Merge conflict…" If that sounds familiar, it's just your imagination.
 - **They wave when they pass each other in the hallway.** Great company culture.

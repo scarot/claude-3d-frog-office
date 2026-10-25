@@ -38,6 +38,12 @@ const I18N = (() => {
       "ev.ask": "승인을 기다립니다 — {a}", "ev.subwork": "서브에이전트와 일하는 중", "ev.done": "일을 마쳤습니다",
       "ev.subIn": "서브에이전트 출근 — {a}", "ev.subOut": "서브에이전트 퇴근 — {a}",
       "ev.check": "확인 필요", "ev.task": "일 받음", "ev.end": "일 끝",
+      // 에이전트 팀 — 책임자(관제실)·팀원
+      "chip.lead": "책임자", "chip.mate": "팀원",
+      "status.lead": "지시 대기", "status.watch": "팀 지켜보는 중",
+      "tag.lead": "★ {name}", "tag.mate": "{name} · 팀원",
+      "board.title": "관제판", "board.work": "작업 중", "board.idle": "대기", "board.more": "외 {n}명",
+      "d.team": "팀원 {n}명", "d.mate": "{lead} 팀원",
     },
     en: {
       title: "3D Office",
@@ -70,6 +76,11 @@ const I18N = (() => {
       "ev.ask": "Needs you — {a}", "ev.subwork": "Working with subagents", "ev.done": "Finished",
       "ev.subIn": "Subagent joined — {a}", "ev.subOut": "Subagent done — {a}",
       "ev.check": "check needed", "ev.task": "new task", "ev.end": "done",
+      "chip.lead": "Lead", "chip.mate": "Teammate",
+      "status.lead": "Awaiting instructions", "status.watch": "Watching the team",
+      "tag.lead": "★ {name}", "tag.mate": "{name} · teammate",
+      "board.title": "Team board", "board.work": "working", "board.idle": "idle", "board.more": "+{n} more",
+      "d.team": "{n} teammate(s)", "d.mate": "Teammate of {lead}",
     },
   };
 
@@ -79,13 +90,13 @@ const I18N = (() => {
       text: "💬 {a}", read: "📖 {a} 읽는 중", edit: "✏️ {a} 고치는 중", write: "📝 {a} 쓰는 중", bash: "🔧 {a}",
       grep: "🔍 '{a}' 찾는 중", glob: "🔍 {a} 파일 찾는 중", fetch: "🌐 {a} 읽는 중", search: "🌐 '{a}' 검색 중",
       agent: "🐣 서브에이전트에게 맡김: {a}", todo: "🗒️ 할 일 정리 중", skill: "📚 {a} 펼치는 중",
-      mcp: "🔌 {a} 쓰는 중", tool: "⚙️ {a} 쓰는 중",
+      mcp: "🔌 {a} 쓰는 중", tool: "⚙️ {a} 쓰는 중", report: "📨 보고 · {a}",
     },
     en: {
       text: "💬 {a}", read: "📖 Reading {a}", edit: "✏️ Editing {a}", write: "📝 Writing {a}", bash: "🔧 {a}",
       grep: "🔍 Searching '{a}'", glob: "🔍 Finding files {a}", fetch: "🌐 Reading {a}", search: "🌐 Searching '{a}'",
       agent: "🐣 Delegated: {a}", todo: "🗒️ Updating the to-do list", skill: "📚 Opening skill {a}",
-      mcp: "🔌 Using {a}", tool: "⚙️ Using {a}",
+      mcp: "🔌 Using {a}", tool: "⚙️ Using {a}", report: "📨 Report · {a}",
     },
   };
   // 인자가 비었을 때 대신 넣는 말

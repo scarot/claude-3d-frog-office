@@ -151,13 +151,17 @@ test('스냅샷이 터지면 500 JSON, 서버는 산다', async () => {
   }
 });
 
-test('데모: 6~8명, 승인 대기·꼬마·서브에이전트·서버실 1명, demo:true', async () => {
+test('데모: 7명 + 팀원 2명, 승인 대기·꼬마·서브에이전트·서버실 1명·책임자 1명, demo:true', async () => {
   const demo = createOfficeServer({ webDir: web, demo: true });
   const p = await listen(demo);
   try {
     const j = JSON.parse((await req(p, '/api/office')).body);
     assert.equal(j.demo, true);
-    assert.ok(j.people.length >= 6 && j.people.length <= 8);
+    assert.equal(j.people.length, 9);
+    const lead = j.people.filter((x) => x.role === 'lead');
+    assert.equal(lead.length, 1);
+    assert.deepEqual(j.people.filter((x) => x.role === 'teammate').map((x) => [x.name, x.lead === lead[0].id]),
+      [['reviewer', true], ['tester', true]]);
     assert.equal(new Set(j.people.map((x) => x.name)).size, j.people.length);
     assert.ok(j.people.some((x) => x.status === 'decision' && x.ask && x.pending === 1));
     assert.ok(j.people.some((x) => x.kid));

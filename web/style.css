@@ -61,14 +61,18 @@ button { font: inherit; color: inherit; }
 .o-person.open { background: var(--soft); border-color: rgba(20, 30, 25, .16); }
 .o-person.flash { animation: o-flash 1.2s ease-out; }
 @keyframes o-flash { 0%, 30% { background: #FFF6C9; border-color: #E5C64A; } }
-.o-head { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; padding: 4px 8px; text-align: left;
-  font-size: 14px; background: none; border: 0; cursor: pointer; }
+.o-head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; width: 100%; min-width: 0; padding: 4px 8px; text-align: left;
+  font-size: 14px; background: none; border: 0; cursor: pointer; }   /* 칩이 많으면 이름을 다 지우지 말고 다음 줄로 */
 .o-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .o-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .o-chip { flex-shrink: 0; padding: 0 6px; border-radius: 4px; font-size: 13px; background: #EEF1EF; color: #44504A; }
 .o-chip.work { background: var(--work-bg); color: var(--work); }
 .o-chip.ask { background: var(--ask-bg); color: var(--ask); }
 .o-chip.sub { background: var(--sub-bg); color: var(--sub); }
+/* 에이전트 팀 — 책임자 칩, 팀원은 책임자 아래로 들여 쓴다 */
+.o-chip.lead { background: #FFF1D6; color: #7A4A00; font-weight: 700; }
+.o-chip.mate { background: var(--sub-bg); color: var(--sub); }
+.o-person.o-mate { margin-left: 14px; border-left: 2px solid #E8ECEA; border-radius: 0 6px 6px 0; }
 .o-doing, .o-sub { margin: 0 8px 0 23px; font-size: 13px; color: var(--ink2); white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; }
 .o-doing.ask { color: var(--ask); font-weight: 600; }

@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  LOG_N, describe, forget, lastState, oneLine, readTranscript, runningSubagents, scanChunk, stats, subagentRunning,
+  LOG_N, describe, forget, lastState, oneLine, readTranscript, reports, runningSubagents, scanChunk, stats, subagentRunning,
+  teammateFiles,
 } from '../server/activity.mjs';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'office-act-'));
@@ -194,4 +195,40 @@ test('runningSubagents: 일하는 것만, 메타 붙여 출근 순서대로', ()
   assert.deepEqual(a, { id: 'aaa', type: 'Explore', desc: 'find auth code', doing: { k: 'grep', a: 'auth' } });
   assert.deepEqual(runningSubagents(path.join(tmp, 'nope.jsonl')), []);
   assert.deepEqual(runningSubagents(''), []);
+});
+
+// 에이전트 팀 — 실측(2.1.310) 모양: 팀원 보고는 책임자 대화의 user 줄, 팀원 대화는 subagents/ 아래 + taskKind 메타
+const teamMsg = (id, body, summary) =>
+  `Another Claude session sent a message:\n<teammate-message teammate_id="${id}" color="blue"${summary ? ` summary="${summary}"` : ''}>\n${body}\n</teammate-message>\n\nThis came from another Claude session`;
+
+test('reports: 팀원 보고는 Act(report), 대기 알림(JSON 본문)은 뺀다', () => {
+  assert.deepEqual(reports(teamMsg('reader', '긴 본문', 'README 세 줄 요약 전달')), [{ k: 'report', a: 'reader: README 세 줄 요약 전달' }]);
+  assert.deepEqual(reports(teamMsg('checker', 'node v24 확인함')), [{ k: 'report', a: 'checker: node v24 확인함' }]);
+  assert.deepEqual(reports(teamMsg('reader', '{"type":"idle_notification","from":"reader","idleReason":"available"}')), []);
+  assert.deepEqual(reports('그냥 사용자 말'), []);
+  const main = path.join(tmp, 'team', 'lead.jsonl');
+  writeJsonl(main, [asst([tool('Read', { file_path: '/w/a.md' })]), user(teamMsg('reader', 'x', '요약 전달'), '2026-10-22T01:00:05.000Z')]);
+  assert.deepEqual(readTranscript(main).log.map((e) => [e.k, e.a]), [['read', 'a.md'], ['report', 'reader: 요약 전달']]);
+});
+
+test('팀원: runningSubagents 에서 빠지고, teammateFiles 가 이름별 최근 파일을 준다', () => {
+  const main = path.join(tmp, 'team2', 'lead.jsonl');
+  writeJsonl(main, [asst([{ type: 'text', text: 'hi' }])]);
+  const dir = path.join(tmp, 'team2', 'lead', 'subagents');
+  const mate = (file, name, rows, ago) => {
+    writeJsonl(path.join(dir, `${file}.jsonl`), rows);
+    fs.writeFileSync(path.join(dir, `${file}.meta.json`), JSON.stringify({ name, taskKind: 'in_process_teammate', teamName: 'session-lead' }));
+    const t = (Date.now() - ago) / 1000;
+    fs.utimesSync(path.join(dir, `${file}.jsonl`), t, t);
+  };
+  mate('agent-areader-1', 'reader', [asst([tool('Read', { file_path: '/w/README.md' })], { stop: 'tool_use' })], 1000);
+  mate('agent-areader-0', 'reader', [asst([{ type: 'text', text: 'old' }], { stop: 'end_turn' })], 60000);
+  mate('agent-achecker-2', 'checker', [asst([{ type: 'text', text: 'done' }], { stop: 'end_turn' })], 2000);
+  writeJsonl(path.join(dir, 'agent-sub.jsonl'), [asst([tool('Grep', { pattern: 'x' })], { stop: 'tool_use' })]);
+  assert.deepEqual(runningSubagents(main).map((s) => s.id), ['sub']);
+  const files = teammateFiles(main);
+  assert.deepEqual([...files.keys()].sort(), ['checker', 'reader']);
+  assert.equal(path.basename(files.get('reader')), 'agent-areader-1.jsonl');
+  assert.equal(subagentRunning(files.get('reader')), true);
+  assert.equal(subagentRunning(files.get('checker')), false);
 });

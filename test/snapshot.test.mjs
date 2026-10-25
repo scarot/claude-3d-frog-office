@@ -259,6 +259,43 @@ test('git 저장소: 하위 폴더 세션도 루트로 묶이고, 커밋이 적�
   assert.equal(fs.realpathSync(p.id), fs.realpathSync(repo));
 });
 
+test('에이전트 팀: 책임자는 role=lead, 팀원은 한 명씩 role=teammate, 꼬마(subs)에서는 빠지고 팀이 끝나면 사라진다', async () => {
+  const base = fresh();
+  const cwd = folder(base, 'team-app');
+  const main = transcript(cwd, 'lead1', [asst(iso(3000), [read('/x/a')], 'tool_use')]);
+  putCard('lead1', { kind: 'rest', cwd, updatedAt: iso(5000), ...live });
+  const team = path.join(process.env.CLAUDE_CONFIG_DIR, 'teams', 'session-lead1');
+  fs.mkdirSync(team, { recursive: true });
+  fs.writeFileSync(path.join(team, 'config.json'), JSON.stringify({
+    name: 'session-lead1', leadSessionId: 'lead1',
+    members: [{ name: 'team-lead', agentType: 'team-lead' }, { name: 'reader', agentType: 'Explore', model: 'opus' },
+              { name: 'checker', agentType: 'verify-runner', model: 'haiku' }],
+  }));
+  const sub = path.join(main.replace(/\.jsonl$/, ''), 'subagents');
+  fs.mkdirSync(sub, { recursive: true });
+  const mate = (file, name, row) => {
+    fs.writeFileSync(path.join(sub, `${file}.jsonl`), JSON.stringify({ ...row, cwd }) + '\n');
+    fs.writeFileSync(path.join(sub, `${file}.meta.json`), JSON.stringify({ name, taskKind: 'in_process_teammate', teamName: 'session-lead1' }));
+  };
+  mate('agent-areader-1', 'reader', asst(iso(1000), [read('/x/README.md')], 'tool_use'));
+  mate('agent-achecker-2', 'checker', asst(iso(2000), [{ type: 'text', text: 'done' }], 'end_turn'));
+
+  const s = await snap();
+  assert.equal(s.people.length, 3);
+  const lead = s.people.find((p) => p.role === 'lead');
+  assert.equal(lead.name, 'team-app');
+  assert.equal(lead.subCount, 0);
+  const mates = s.people.filter((p) => p.role === 'teammate').sort((a, b) => a.name.localeCompare(b.name));
+  assert.deepEqual(mates.map((p) => [p.name, p.status, p.lead === lead.id, p.type, p.model]),
+    [['checker', 'rest', true, 'verify-runner', 'haiku'], ['reader', 'working', true, 'Explore', 'opus']]);
+  assert.deepEqual(mates[1].doing, { k: 'read', a: 'README.md' });
+  assert.equal(new Set(s.people.map((p) => p.id)).size, 3);
+
+  fs.rmSync(team, { recursive: true });   // 세션이 끝나면 Claude 가 팀 폴더를 지운다
+  const after = await snap();
+  assert.deepEqual(after.people.map((p) => [p.name, p.role]), [['team-app', undefined]]);
+});
+
 test('git 실행이 바로 던져도(윈도우 spawn UNKNOWN) 스냅샷은 git 없이 나온다', async () => {
   const base = fresh();
   const cwd = folder(base, 'my-app');

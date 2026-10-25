@@ -13,6 +13,13 @@ const OfficePanel = (() => {
   const STATUS = { decision: "ask", working: "work", rest: "rest" };
   function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function dot(color) { const d = el("i", "o-dot"); d.style.background = color; return d; }
+  // 에이전트 팀 — 책임자(role=lead)의 팀원(role=teammate, lead=책임자 id)
+  const matesOf = d => P.people.filter(q => q.role === "teammate" && q.lead === d.id);
+  // 책임자가 쉬는 중 = 사용자 지시를 기다린다(팀원이 일하는 중이면 지켜보는 중)
+  function chipText(d, mode) {
+    if (d.role === "lead" && mode === "rest") return t(matesOf(d).some(q => modeOf(q) === "working") ? "status.watch" : "status.lead");
+    return t("status." + mode);
+  }
 
   // ---------- 사람 목록 ----------
   function what(d, open) {
@@ -32,7 +39,10 @@ const OfficePanel = (() => {
       p.append(el("span", "o-k", t("d.path")), el("code", null, d.path));
       box.append(p);
     }
-    const facts = [t("d.sessions", { n: d.sessions || 1 })];
+    const facts = d.role === "teammate"
+      ? [t("d.mate", { lead: P.people.find(q => q.id === d.lead)?.name || "" }), d.type, d.model].filter(Boolean)
+      : [t("d.sessions", { n: d.sessions || 1 })];
+    if (d.role === "lead") facts.push(t("d.team", { n: matesOf(d).length }));
     if (d.commits != null) facts.push(t("d.commits", { n: d.commits }));
     if (d.pending > 1) facts.push(t("d.pending", { n: d.pending }));
     if (d.source === "transcript") facts.push(t("d.transcript"));
@@ -54,12 +64,16 @@ const OfficePanel = (() => {
   }
   function item(d) {
     const open = d.id === P.sel, mode = modeOf(d), cls = STATUS[mode];
-    const li = el("li", "o-person" + (open ? " open" : ""));
+    const role = d.role === "lead" ? " o-lead" : d.role === "teammate" ? " o-mate" : "";
+    const li = el("li", "o-person" + role + (open ? " open" : ""));
     li.dataset.id = d.id;
     const head = el("button", "o-head");
     head.type = "button";
     head.setAttribute("aria-expanded", open ? "true" : "false");
-    head.append(dot(OfficeLife.colorOf(d.name)), el("b", null, d.name), el("span", `o-chip ${cls}`, t("status." + mode)));
+    head.append(dot(OfficeLife.colorOf(d.name)), el("b", null, d.role === "lead" ? `★ ${d.name}` : d.name));
+    if (d.role === "lead") head.append(el("span", "o-chip lead", t("chip.lead")));
+    if (d.role === "teammate") head.append(el("span", "o-chip mate", t("chip.mate")));
+    head.append(el("span", `o-chip ${cls}`, chipText(d, mode)));
     if (d.subCount) head.append(el("span", "o-chip sub", t("chip.subs", { n: d.subCount })));
     head.onclick = () => P.pick?.(d.id);
     li.append(head);
@@ -82,7 +96,12 @@ const OfficePanel = (() => {
     P.sel = sel || null;
     const list = $("office-people");
     const order = { decision: 0, working: 1 };
-    const sorted = [...P.people].sort((a, b) => (order[modeOf(a)] ?? 2) - (order[modeOf(b)] ?? 2) || a.name.localeCompare(b.name));
+    const byMode = (a, b) => (order[modeOf(a)] ?? 2) - (order[modeOf(b)] ?? 2) || a.name.localeCompare(b.name);
+    // 팀이 맨 위 — 책임자 바로 아래에 그 팀원들, 그다음 나머지 사람들
+    const leads = P.people.filter(p => p.role === "lead").sort(byMode);
+    const led = new Set(leads.map(p => p.id));
+    const sorted = [...leads.flatMap(l => [l, ...matesOf(l).sort(byMode)]),
+                    ...P.people.filter(p => p.role !== "lead" && !(p.role === "teammate" && led.has(p.lead))).sort(byMode)];
     $("office-count").textContent = t("count", { n: sorted.length, w: sorted.filter(p => modeOf(p) === "working").length });
     const keep = list.scrollTop;
     list.replaceChildren(...sorted.map(item));
