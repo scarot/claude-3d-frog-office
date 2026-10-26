@@ -231,9 +231,11 @@ const I18N = (() => {
     if (key === "subOut") return t("ev.subOut", { a: cut(arg || t("ev.end"), 22) });
     return t("ev." + key);
   }
-  // 로그 시각 — 보는 사람의 시간대
-  const time = ms => new Date(ms).toLocaleTimeString(lang === "ko" ? "ko-KR" : "en-GB",
-    { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  // 로그 시각 — 보는 사람의 시간대, "10-26 13:05:21"(월-일 시:분:초). 언어와 무관하게 같은 꼴이라 칸 폭이 고르다
+  const time = ms => {
+    const d = new Date(ms), p = n => String(n).padStart(2, "0");
+    return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  };
 
   return {
     get lang() { return lang; },
